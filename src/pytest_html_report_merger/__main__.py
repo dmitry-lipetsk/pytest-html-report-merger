@@ -59,6 +59,41 @@ class PytestHTMLReportMerger:
         hours, minutes = divmod(minutes, 60)
         return "{:02d}:{:02d}:{:02d}".format(int(hours), int(minutes), int(seconds))
 
+    def _parse_summary(self, report):
+        # use a regular expression to find a string like:
+        # 402 tests took 09:40:47.
+        # this string shows up if test cases were run
+        element = report.select(".run-count")[0]
+        pattern = r"(\d+) tests{0,1} took (\d{2}):(\d{2}):(\d{2})"
+        matches = re.search(pattern, element.string)
+        if matches is not None:
+            total_tests = int(matches.groups()[0])
+            (t_hour, t_minute, t_second) = matches.groups()[1:4]
+            total_time_delta = datetime.timedelta(
+                hours=int(t_hour), minutes=int(t_minute), seconds=int(t_second)
+            )
+        else:
+            # use a regular expression to look for a string like:
+            # 0 test took 0 ms.
+            # this string shows up if there were no tests run.
+            # i think the units will always be ms
+            pattern = r"(\d+) tests{0,1} took (\d+)"
+            matches = re.search(pattern, element.string)
+            if matches is not None:
+                total_tests = int(matches.groups()[0])
+                t_ms = int(matches.groups()[1])
+                total_time_delta = datetime.timedelta(seconds=t_ms * 1000)
+            else:
+                # TODO:
+                # there is a bigger problem with our regular expressions we have
+                # to investigate. for now, we don't fail because it is more
+                # important that we get the merged results than get the number of
+                # tests correct.
+                total_tests = 0
+                total_time_delta = datetime.timedelta(seconds=0)
+
+        return (total_tests, total_time_delta)
+
     def process_report(self, report_path):
         # open the first html file
         html_doc = ""
@@ -102,26 +137,10 @@ class PytestHTMLReportMerger:
         # t = datetime.datetime.strptime(base_total_time_str,"%H:%M:%S")
 
         # parse the number of tests and timings from the base report
-        base_element = self.base.select(".run-count")[0]
-        matches = re.search(
-            r"(\d+) tests took (\d{2}):(\d{2}):(\d{2})", base_element.string
-        )
-        base_total_tests = int(matches.groups()[0])
-        (t_hour, t_minute, t_second) = matches.groups()[1:4]
-        base_total_time_delta = datetime.timedelta(
-            hours=int(t_hour), minutes=int(t_minute), seconds=int(t_second)
-        )
+        (base_total_tests, base_total_time_delta) = self._parse_summary(self.base)
 
         # parse the number of tests and timings from the provided report
-        soup_element = soup.select(".run-count")[0]
-        matches = re.search(
-            r"(\d+) tests took (\d{2}):(\d{2}):(\d{2})", soup_element.string
-        )
-        soup_total_tests = int(matches.groups()[0])
-        (t_hour, t_minute, t_second) = matches.groups()[1:4]
-        soup_total_time_delta = datetime.timedelta(
-            hours=int(t_hour), minutes=int(t_minute), seconds=int(t_second)
-        )
+        (soup_total_tests, soup_total_time_delta) = self._parse_summary(soup)
 
         # sum up the test count and time deltas
         total_tests = base_total_tests + soup_total_tests
@@ -129,6 +148,7 @@ class PytestHTMLReportMerger:
         total_time_str = self._format_time(total_time_delta)
 
         # save the updated total tests and total time.
+        base_element = self.base.select(".run-count")[0]
         base_element.string = f"{total_tests} tests took {total_time_str}."
 
         # parse the filter counts

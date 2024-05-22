@@ -35,6 +35,40 @@ test:
 	    --tb=short \
 	    ${PYTESTOPTS}
 
+.PHONY: generate-results
+generate-results:
+	rm -rf data/reports
+	mkdir data/reports
+	poetry run pytest \
+	    --verbose \
+	    --tb=short \
+	    -c data/tests/pytest.ini \
+	    --html data/reports/report_001.html \
+	    -k Set1 \
+	    || true
+	poetry run pytest \
+	    --verbose \
+	    --tb=short \
+	    -c data/tests/pytest.ini \
+	    --html data/reports/report_002.html \
+	    -k Set2 \
+	    || true
+	poetry run pytest \
+	    --verbose \
+	    --tb=short \
+	    -c data/tests/pytest.ini \
+	    --html data/reports/report_003.html \
+	    -k Set3 \
+	    || true
+	poetry run pytest \
+	    --verbose \
+	    --tb=short \
+	    -c data/tests/pytest.ini \
+	    --html data/reports/report_004.html \
+	    -k Set4 \
+	    || true
+
+
 .PHONY: clean
 clean:
 	find . \( -name '*.pyc' -or -name '*.pyo' \) -print -delete
