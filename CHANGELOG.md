@@ -2,6 +2,35 @@
 
 
 
+## v0.1.3 (2024-05-22)
+
+### Fix
+
+* fix: summary notes in merged reports (#4)
+
+Update the way we parse the number of tests and the total time from each
+html report to support html reports that have use formats like:
+```
+0 test took 0 ms.
+```
+where the test time is `0 ms` instead of the format `00:00:00`, and
+```
+1 test took 00:00:04.
+```
+where they use `test` instead of `tests`.
+
+In __main__.py, the `_parse_summary()` function does a little bit better
+jobs of parsing the html report summary information. It allows us to
+expand the search for summary information in the future if needed and
+tries not to die if we can&#39;t parse the summary information as we
+expected.
+
+Also adding a Makefile target, named `generate-results`, which runs some
+tests and generated html reports that we can merge to test different
+scenarios. Instructions for how to use the that target and the `run`
+target are in the README.md. ([`db82118`](https://github.com/dskard/pytest-html-report-merger/commit/db82118f0b2177ea8feb7884199d807b9f91b59a))
+
+
 ## v0.1.2 (2023-10-23)
 
 ### Fix
