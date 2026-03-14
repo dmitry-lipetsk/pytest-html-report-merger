@@ -1,25 +1,50 @@
 import argparse
 import bs4
 import copy
-import datetime
 import json
 import logging
 import os
+import sys
 import re
+import glob
+import typing
+import collections
 
 
 log = logging.getLogger(__name__)
 
 
 def parse_arguments():
-    command_parser = argparse.ArgumentParser()
+    command_parser = argparse.ArgumentParser(
+        description="A professional tool to merge multiple pytest-html reports into a single one with consistent metadata.",
+        epilog="Example: pytest-html-report-merger -i ./reports -o summary.html --title 'Nightly Build'"
+    )
 
     command_parser.add_argument(
         "--out",
+        "-o",
         help="name of the output html report",
         action="store",
         dest="out",
         default="merged.html",
+        type=str,
+    )
+
+    command_parser.add_argument(
+        "--input-dir",
+        "-i",
+        help="directory containing html reports to merge (can be used multiple times)",
+        action="append",
+        dest="input_dirs",
+        type=str,
+    )
+
+    command_parser.add_argument(
+        "--title",
+        "-t",
+        help="title of the output html report",
+        action="store",
+        dest="title",
         type=str,
     )
 
@@ -46,113 +71,151 @@ def parse_arguments():
 
 
 class PytestHTMLReportMerger:
+    _summary_count: int
+    _summary_duration: float
+    _summary_outcome: typing.Dict[str, int]
+    _summary_tests: typing.Dict[str, typing.Any]
+    _summary_envs: typing.Dict[str, typing.Any]
+
     def __init__(self):
         self.base = None
+        self._summary_count = 0
+        self._summary_duration = 0.0
+        self._summary_outcome = {}
+        self._summary_tests = {}
+        self._summary_envs = {}
+        return
 
-    def _format_time(self, td):
-        """convert timedelta to HH:MM:SS
+    @staticmethod
+    def _parse_frac(frac_str: str) -> float:
+        assert type(frac_str) is str
 
-        based on https://stackoverflow.com/a/28503916
-        """
+        main_part = frac_str[:6]
+        tail = frac_str[6:7]
 
-        minutes, seconds = divmod(td.total_seconds(), 60)
+        fraction_val = int(main_part) if main_part else 0
+        power_of_10 = len(main_part)
+
+        if tail and int(tail[0]) > 4:
+            fraction_val += 1
+
+        return fraction_val / (10 ** power_of_10)
+
+    @staticmethod
+    def _parse_duration_to_seconds(duration_val: typing.Any) -> float:
+        if isinstance(duration_val, (int, float)):
+            return float(duration_val)
+
+        val_str = str(duration_val).strip()
+
+        # 1. HH:MM:SS.mmmmmm (fractional is optional)
+        hms_match = re.fullmatch(r"(\d+):(\d{2}):(\d{2})(?:\.(\d+))?", val_str)
+        if hms_match:
+            h, m, s, frac_str = hms_match.groups()
+
+            total_seconds = int(h) * 3600 + int(m) * 60 + int(s)
+
+            if frac_str is not None:
+                total_seconds += __class__._parse_frac(frac_str)
+
+            return float(total_seconds)
+
+        # 2. Forma "number ms"
+        ms_match = re.fullmatch(r"^(\d+(?:\.\d+)?)\s*ms$", val_str)
+        if ms_match:
+            return float(ms_match.group(1)) / 1000.0
+
+        # 3. Clear seconds (with/without fraction)
+        sec_match = re.fullmatch(r"^(\d+(?:\.\d+)?)$", val_str)
+        if sec_match:
+            return float(sec_match.group(1))
+
+        raise ValueError(f"Invalid duration format: '{duration_val}'")
+
+    @staticmethod
+    def _format_time(duration):
+        assert type(duration) is float
+        assert duration >= 0
+
+        if duration < 1:
+            return "{} ms".format(int(duration * 1000))
+
+        minutes, seconds = divmod(int(duration), 60)
         hours, minutes = divmod(minutes, 60)
-        return "{:02d}:{:02d}:{:02d}".format(int(hours), int(minutes), int(seconds))
+        return "{:02d}:{:02d}:{:02d}".format(
+            int(hours),
+            int(minutes),
+            int(seconds)
+        )
 
-    def _parse_summary(self, report):
-        # use a regular expression to find a string like:
-        # 402 tests took 09:40:47.
-        # this string shows up if test cases were run
-        element = report.select(".run-count")[0]
-        pattern = r"(\d+) tests{0,1} took (\d{2}):(\d{2}):(\d{2})"
-        matches = re.search(pattern, element.string)
-        if matches is not None:
-            total_tests = int(matches.groups()[0])
-            (t_hour, t_minute, t_second) = matches.groups()[1:4]
-            total_time_delta = datetime.timedelta(
-                hours=int(t_hour), minutes=int(t_minute), seconds=int(t_second)
-            )
-        else:
-            # use a regular expression to look for a string like:
-            # 0 test took 0 ms.
-            # this string shows up if there were no tests run.
-            # i think the units will always be ms
-            pattern = r"(\d+) tests{0,1} took (\d+)"
-            matches = re.search(pattern, element.string)
-            if matches is not None:
-                total_tests = int(matches.groups()[0])
-                t_ms = int(matches.groups()[1])
-                total_time_delta = datetime.timedelta(seconds=t_ms * 1000)
-            else:
-                # TODO:
-                # there is a bigger problem with our regular expressions we have
-                # to investigate. for now, we don't fail because it is more
-                # important that we get the merged results than get the number of
-                # tests correct.
-                total_tests = 0
-                total_time_delta = datetime.timedelta(seconds=0)
-
-        return (total_tests, total_time_delta)
+    def _process_test(self, test: typing.Dict[str, typing.Any]) -> None:
+        assert test is not None
+        self._summary_duration += __class__._parse_duration_to_seconds(test.get("duration", 0.0))
+        test_outcome = test.get("result", "unknown").lower()
+        self._summary_outcome[test_outcome] = self._summary_outcome.get(test_outcome, 0) + 1
+        return
 
     def process_report(self, report_path):
-        # open the first html file
         html_doc = ""
         with open(report_path, "r") as f:
             html_doc = f.read()
         soup = bs4.BeautifulSoup(html_doc, features="html.parser")
 
-        report_name = os.path.basename(report_path)
-
-        # update the base report
+        # copy the base report
         if self.base is None:
-            # this is the first report
             self.base = copy.copy(soup)
 
-            # load json data from the base report
-            base_data_container = self.base.select("#data-container")[0]
-            base_jsonblob = base_data_container.get("data-jsonblob")
-            base_data = json.loads(base_jsonblob)
+        # load json data from the current report
+        report_data_container = soup.select("#data-container")[0]
+        report_jsonblob = report_data_container.get("data-jsonblob")
+        report_data = json.loads(report_jsonblob)
 
-            # update the keys to include the report name
-            # this will make sure the keys are unique as we add more reports.
-            d = {
-                f"{key} - {report_name}": value
-                for key, value in base_data["tests"].items()
-            }
-            base_data["tests"] = d
+        # Calculate summary
+        for _, test_data in report_data.get("tests", {}).items():
+            if type(test_data) is list:
+                # Reruns case ...
+                assert len(test_data) > 0
+                for test in test_data:
+                    self._process_test(test)
+            elif type(test_data) is dict:
+                self._process_test(test_data)
+            else:
+                raise RuntimeError("Unexpected test_data type: {}.".format(
+                    type(test_data).__name__
+                ))
 
-            # write the json data back to the html element's attribute
-            base_data_container["data-jsonblob"] = json.dumps(base_data)
+            self._summary_count += 1
+            new_test_key = str(self._summary_count)
+            self._summary_tests[new_test_key] = copy.deepcopy(test_data)
+            continue
 
-            return
+        # Update envs
+        self._summary_envs.update(report_data.get("environment", {}))
+        return
 
-        # parse the summary
+    def write_report(self, report_path, report_title):
+        assert type(self.base) is not None
+        if report_title is None:
+            report_title = os.path.basename(report_path)
 
-        # it would be nice if we could pull the Hours:Minutes:Seconds out of
-        # the summary string, but pytest-html has a bug in _format_duration()
-        # that allows the seconds to be 60, which datetime.datetime.strptime()
-        # cannot parse. when that gets fixed, we can use lines like these
-        # matches = re.search(r"(\d+) tests took (\d{2}):(\d{2}):(\d{2})", base_element.string)
-        # base_total_time_str = matches.groups()[1]
-        # t = datetime.datetime.strptime(base_total_time_str,"%H:%M:%S")
+        # reset the title in the <head><title> element
+        ele = self.base.select("#head-title")[0]
+        ele.string = report_title
 
-        # parse the number of tests and timings from the base report
-        (base_total_tests, base_total_time_delta) = self._parse_summary(self.base)
-
-        # parse the number of tests and timings from the provided report
-        (soup_total_tests, soup_total_time_delta) = self._parse_summary(soup)
-
-        # sum up the test count and time deltas
-        total_tests = base_total_tests + soup_total_tests
-        total_time_delta = base_total_time_delta + soup_total_time_delta
-        total_time_str = self._format_time(total_time_delta)
+        # reset the title in the <body><h1> element
+        ele = self.base.select("#title")[0]
+        ele.string = report_title
 
         # save the updated total tests and total time.
         base_element = self.base.select(".run-count")[0]
-        base_element.string = f"{total_tests} tests took {total_time_str}."
+        test_suffix = "test" if len(self._summary_tests) == 1 else "tests"
+        base_element.string = "{} {} took {}.".format(
+            len(self._summary_tests),
+            test_suffix,
+            __class__._format_time(self._summary_duration)
+        )
 
-        # parse the filter counts
-
+        # update the filter counts
         for key in [
             "passed",
             "skipped",
@@ -161,62 +224,30 @@ class PytestHTMLReportMerger:
             "xfailed",
             "xpassed",
             "rerun",
+            "retried",
         ]:
+            value = self._summary_outcome.get(key, 0)
+
             # find the base's value for the key
             base_elements = self.base.select(f".filters .{key}")
-            matches = re.search(r"(\d+)", base_elements[0].string)
+            assert base_elements is not None
+            assert len(base_elements) == 1
+            base_element0 = base_elements[0]
+            assert base_element0.string is not None , "key: {}".format(key)
+            matches = re.search(r"(\d+)", base_element0.string)
             base_value = int(matches.groups()[0])
 
-            # find the soup's value for the key
-            soup_elements = soup.select(f".filters .{key}")
-            matches = re.search(r"(\d+)", soup_elements[0].string)
-            soup_value = int(matches.groups()[0])
-
             # save the updated count to the base
-            base_elements[0].string = re.sub(
-                r"\d+", str(base_value + soup_value), base_elements[0].string
+            base_element0.string = re.sub(
+                r"\d+",
+                str(value),
+                base_element0.string,
             )
 
             # remove the base's disabled filter if the soup value was not zero
-            if base_value == 0 and soup_value > 0:
+            if base_value == 0 and value > 0:
                 ele = self.base.select(f"[data-test-result='{key}']")[0]
                 del ele["disabled"]
-
-        # update the base report's results table
-
-        # load json data from the base report
-        base_data_container = self.base.select("#data-container")[0]
-        base_jsonblob = base_data_container.get("data-jsonblob")
-        base_data = json.loads(base_jsonblob)
-
-        # load json data from the provided report
-        soup_data_container = soup.select("#data-container")[0]
-        soup_jsonblob = soup_data_container.get("data-jsonblob")
-        soup_data = json.loads(soup_jsonblob)
-
-        # update the keys to include the report name
-        # this will make sure the keys are unique as we add more reports.
-        d = {
-            f"{key} - {report_name}": value for key, value in soup_data["tests"].items()
-        }
-        soup_data["tests"] = d
-
-        # copy the tests from the provided report to the base report
-        base_data["tests"] = base_data["tests"] | soup_data["tests"]
-
-        # write the tests json data back to the html element's attribute
-        base_data_container["data-jsonblob"] = json.dumps(base_data)
-
-    def write_report(self, report_path):
-        report_name = os.path.basename(report_path)
-
-        # reset the title in the <head><title> element
-        ele = self.base.select("#head-title")[0]
-        ele.string = report_name
-
-        # reset the title in the <body><h1> element
-        ele = self.base.select("#title")[0]
-        ele.string = report_name
 
         # load json data from the base report
         base_data_container = self.base.select("#data-container")[0]
@@ -224,7 +255,10 @@ class PytestHTMLReportMerger:
         base_data = json.loads(base_jsonblob)
 
         # reset the title in the footer's data-jsonblob
-        base_data["title"] = report_name
+        base_data["title"] = report_title
+
+        base_data["tests"] = self._summary_tests
+        base_data["environment"] = self._summary_envs
 
         # write the json data back to the html element's attribute
         base_data_container["data-jsonblob"] = json.dumps(base_data)
@@ -232,18 +266,68 @@ class PytestHTMLReportMerger:
         # write to file
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(str(self.base.prettify(formatter="html5")))
+        return
 
 
 def main(arguments):
-    # create a report merger object
+    raw_files = []
+    has_errors = False
+
+    # 1. Collect from directories
+    if arguments.input_dirs:
+        for directory in arguments.input_dirs:
+            abs_dir = os.path.abspath(directory)
+            if not os.path.isdir(abs_dir):
+                log.error(f"Input directory does not exist: '{directory}'")
+                has_errors = True
+                continue
+            
+            pattern = os.path.join(abs_dir, "*.html")
+            found = glob.glob(pattern)
+            raw_files.extend(found)
+
+    # 2. Collect from positional files
+    if arguments.html_files:
+        for f in arguments.html_files:
+            abs_file = os.path.abspath(f)
+            if not os.path.isfile(abs_file):
+                log.error(f"Invalid input: '{f}' is not a file or does not exist.")
+                has_errors = True
+                continue
+            raw_files.append(abs_file)
+
+    # --- THE DEDUPLICATION CHECK ---
+    counts = collections.Counter(raw_files)
+    duplicates = [path for path, count in counts.items() if count > 1]
+    
+    if duplicates:
+        for d in duplicates:
+            log.error(f"Duplicate input file detected: '{d}'")
+        has_errors = True
+
+    # 3. Final check
+    if has_errors:
+        log.error("Termination due to input errors (duplicates or missing files).")
+        sys.exit(1)
+
+    if not raw_files:
+        log.error("No HTML reports found to process.")
+        return
+
+    # 4. Sorting
+    raw_files.sort()
+
+    # Process each report file
     report_merger = PytestHTMLReportMerger()
 
-    # process each of the input files
-    for infile in arguments.html_files:
+    for infile in raw_files:
+        log.info(f"Processing report: {infile}")
         report_merger.process_report(infile)
 
-    # write the merged report to disk
-    report_merger.write_report(arguments.out)
+    # Finalize and write the aggregated report to disk
+    report_merger.write_report(arguments.out, arguments.title)
+    log.info(f"Successfully merged {len(raw_files)} reports into {arguments.out}")
+    return
 
 
 def cli():
@@ -256,3 +340,8 @@ def cli():
     main(arguments)
 
     log.debug("exiting")
+    return
+
+
+if __name__ == "__main__":
+    cli()
