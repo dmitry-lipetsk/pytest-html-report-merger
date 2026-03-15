@@ -1,0 +1,26 @@
+ARG PYTHON_VERSION 
+
+# --------------------------------------------- base1
+FROM python:${PYTHON_VERSION}-alpine AS base1
+
+# --------------------------------------------- base1
+FROM base1 AS base2
+
+# --------------------------------------------- final
+FROM base2 AS final
+
+RUN apk add bash
+
+RUN adduser -D test
+
+ADD . /home/test/merger
+RUN chown -R test /home/test/merger 
+WORKDIR /home/test/merger
+
+USER test
+
+ENTRYPOINT sh -c " \
+set -eux; \
+echo HELLO FROM ENTRYPOINT; \
+echo HOME DIR IS [`realpath ~/`]; \
+bash run_tests3.sh;"
