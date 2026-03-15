@@ -49,25 +49,75 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # ------------------------ PYTEST-HTML==4.0.2
           - platform: "alpine"
             python: "3.8.0"
+            pytest_html: "==4.0.2"
+            case_suffix: "py3_08_00-html_eq4_0_2"
           - platform: "alpine"
             python: "3.8"
+            pytest_html: "==4.0.2"
+            case_suffix: "py3_08_xx-html_eq4_0_2"
           - platform: "alpine"
             python: "3.9"
+            pytest_html: "==4.0.2"
+            case_suffix: "py3_09_xx-html_eq4_0_2"
           - platform: "alpine"
             python: "3.10"
+            pytest_html: "==4.0.2"
+            case_suffix: "py3_10_xx-html_eq4_0_2"
           - platform: "alpine"
             python: "3.11"
+            pytest_html: "==4.0.2"
+            case_suffix: "py3_11_xx-html_eq4_0_2"
           - platform: "alpine"
             python: "3.12"
+            pytest_html: "==4.0.2"
+            case_suffix: "py3_12_xx-html_eq4_0_2"
           - platform: "alpine"
             python: "3.13"
+            pytest_html: "==4.0.2"
+            case_suffix: "py3_13_xx-html_eq4_0_2"
           - platform: "alpine"
             python: "3.14"
+            pytest_html: "==4.0.2"
+            case_suffix: "py3_14_xx-html_eq4_0_2"
+          # ------------------------ PYTEST-HTML: DEFAULT
+          - platform: "alpine"
+            python: "3.8.0"
+            pytest_html: "default"
+            case_suffix: "py3_08_00-html_default"
+          - platform: "alpine"
+            python: "3.8"
+            pytest_html: "default"
+            case_suffix: "py3_08_xx-html_default"
+          - platform: "alpine"
+            python: "3.9"
+            pytest_html: "default"
+            case_suffix: "py3_09_xx-html_default"
+          - platform: "alpine"
+            python: "3.10"
+            pytest_html: "default"
+            case_suffix: "py3_10_xx-html_default"
+          - platform: "alpine"
+            python: "3.11"
+            pytest_html: "default"
+            case_suffix: "py3_11_xx-html_default"
+          - platform: "alpine"
+            python: "3.12"
+            pytest_html: "default"
+            case_suffix: "py3_12_xx-html_default"
+          - platform: "alpine"
+            python: "3.13"
+            pytest_html: "default"
+            case_suffix: "py3_13_xx-html_default"
+          - platform: "alpine"
+            python: "3.14"
+            pytest_html: "default"
+            case_suffix: "py3_14_xx-html_default"
 
     env:
-      BASE_SIGN: "${{ matrix.platform }}-py${{ matrix.python }}"
+      BASE_SIGN: "${{ matrix.platform }}-py${{ matrix.case_suffix }}"
 
     steps:
     - name: Prepare variables
@@ -87,9 +137,18 @@ jobs:
     - name: Adjust logs folder permission
       run: chmod -R 777 "${{ env.RUN_CFG__LOGS_DIR }}"
     - name: Build local image ${{ matrix.alpine }}
-      run: docker build --build-arg PYTHON_VERSION="${{ matrix.python }}" -t "${{ env.RUN_CFG__DOCKER_IMAGE_NAME }}" -f Dockerfile--${{ matrix.platform }}.tmpl .
+      run: |
+        docker build \
+        --build-arg PYTHON_VERSION="${{ matrix.python }}" \
+        --build-arg PYTEST_HTML_SPEC="${{ matrix.pytest_html }}" \
+        -t "${{ env.RUN_CFG__DOCKER_IMAGE_NAME }}" \
+        -f Dockerfile--${{ matrix.platform }}.tmpl \
+        .
     - name: Run
-      run: docker run -t -v ${{ github.workspace }}/${{ env.RUN_CFG__LOGS_DIR }}:/home/test/merger/logs "${{ env.RUN_CFG__DOCKER_IMAGE_NAME }}"
+      run: |
+        docker run -t \
+        -v ${{ github.workspace }}/${{ env.RUN_CFG__LOGS_DIR }}:/home/test/merger/logs \
+        "${{ env.RUN_CFG__DOCKER_IMAGE_NAME }}"
     - name: Upload Logs
       uses: actions/upload-artifact@v6
       if: always() # IT IS IMPORTANT!

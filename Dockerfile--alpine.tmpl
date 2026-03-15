@@ -1,4 +1,5 @@
-ARG PYTHON_VERSION 
+ARG PYTHON_VERSION
+ARG PYTEST_HTML_SPEC
 
 # --------------------------------------------- base1
 FROM python:${PYTHON_VERSION}-alpine AS base1
@@ -18,6 +19,9 @@ RUN chown -R test /home/test/merger
 WORKDIR /home/test/merger
 
 USER test
+
+ARG PYTEST_HTML_SPEC
+ENV PYTEST_HTML_SPEC=${PYTEST_HTML_SPEC}
 
 ENTRYPOINT sh -c " \
 set -eux; \
