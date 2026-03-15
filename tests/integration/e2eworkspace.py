@@ -6,7 +6,6 @@ import tempfile
 import subprocess
 from pathlib import Path
 
-
 # /////////////////////////////////////////////////////////////////////////////
 
 
@@ -30,11 +29,15 @@ class E2EWorkspace:
 
         # Use sys.executable, to be in our venv
         cmd = [
-            sys.executable, "-m", "pytest",
+            sys.executable,
+            "-m",
+            "pytest",
             f"--html={report_path}",
             "--self-contained-html",
-            "-c", "/dev/null",
-            "-p", "no:cacheprovider",  # it disables create ,pytest_cache in /dev
+            "-c",
+            "/dev/null",
+            "-p",
+            "no:cacheprovider",  # it disables create ,pytest_cache in /dev
             str(test_file),
         ]
 
@@ -68,5 +71,6 @@ class E2EWorkspace:
         env["PYTHONPATH"] = str(self.src_path)
         cmd = [sys.executable, "-m", "pytest_html_report_merger"] + args
         return subprocess.run(cmd, capture_output=True, text=True, env=env)
+
 
 # /////////////////////////////////////////////////////////////////////////////

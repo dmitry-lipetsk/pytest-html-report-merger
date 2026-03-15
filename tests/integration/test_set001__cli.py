@@ -2,8 +2,8 @@ import subprocess
 import os
 import typing
 
-
 # //////////////////////////////////////////////////////////////////////////////
+
 
 def run_cli(args: typing.List[str]) -> subprocess.CompletedProcess:
     """
@@ -17,11 +17,12 @@ def run_cli(args: typing.List[str]) -> subprocess.CompletedProcess:
         ["python3", "-m", "pytest_html_report_merger"] + args,
         capture_output=True,
         text=True,
-        env=env
+        env=env,
     )
 
 
 # //////////////////////////////////////////////////////////////////////////////
+
 
 def test_cli_no_args():
     """
@@ -113,19 +114,27 @@ def test_cli_two_unk_dirs_and_two_unk_files():
     C_UNK_DIR2 = "/tmp/path/that/definitely/does/not/exist_dir2"
     C_UNK_FILE1 = "/tmp/path/that/definitely/does/not/exist_file1.html"
     C_UNK_FILE2 = "/tmp/path/that/definitely/does/not/exist_file2.html"
-    result = run_cli([
-        "-i",
-        C_UNK_DIR1,
-        "-i",
-        C_UNK_DIR2,
-        C_UNK_FILE1,
-        C_UNK_FILE2,
-    ])
+    result = run_cli(
+        [
+            "-i",
+            C_UNK_DIR1,
+            "-i",
+            C_UNK_DIR2,
+            C_UNK_FILE1,
+            C_UNK_FILE2,
+        ]
+    )
 
     assert "Input directory does not exist: '{}'".format(C_UNK_DIR1) in result.stderr
     assert "Input directory does not exist: '{}'".format(C_UNK_DIR2) in result.stderr
-    assert "Invalid input: '{}' is not a file or does not exist.".format(C_UNK_FILE1) in result.stderr
-    assert "Invalid input: '{}' is not a file or does not exist.".format(C_UNK_FILE2) in result.stderr
+    assert (
+        "Invalid input: '{}' is not a file or does not exist.".format(C_UNK_FILE1)
+        in result.stderr
+    )
+    assert (
+        "Invalid input: '{}' is not a file or does not exist.".format(C_UNK_FILE2)
+        in result.stderr
+    )
     assert "Termination due to input errors" in result.stderr
     return
 

@@ -9,8 +9,8 @@ from packaging.version import Version
 
 from .e2eworkspace import E2EWorkspace
 
-
 # //////////////////////////////////////////////////////////////////////////////
+
 
 class HTML_FEATURES:
     @staticmethod
@@ -64,6 +64,7 @@ class HTML_FEATURES:
 
 
 # //////////////////////////////////////////////////////////////////////////////
+
 
 class HTML_CHECKER:
     _content: str
@@ -210,12 +211,15 @@ class HTML_CHECKER:
         # Looking for pattern 'v' and digits (v4.0.2)
         match = re.search(r"v(\d+\.\d+\.\d+[\w\.]*)", parent_text)
         if not match:
-            raise RuntimeError("Cannot extract pytest-html version from {0!r}.".format(parent_text))
+            raise RuntimeError(
+                "Cannot extract pytest-html version from {0!r}.".format(parent_text)
+            )
 
         return match.group(1)
 
 
 # //////////////////////////////////////////////////////////////////////////////
+
 
 def test_e2e_001__single_report_metadata():
     """
@@ -234,11 +238,16 @@ def test_e2e_001__single_report_metadata():
         # 2. Define output path and run merger
         output_html = ws.root / "merged_output.html"
         # We point to the directory where run1.html was generated
-        result = ws.run_merger([
-            "-i", str(ws.reports_dir),
-            "-o", str(output_html),
-            "--title", "Single Report Test"
-        ])
+        result = ws.run_merger(
+            [
+                "-i",
+                str(ws.reports_dir),
+                "-o",
+                str(output_html),
+                "--title",
+                "Single Report Test",
+            ]
+        )
 
         # 3. Assertions
         assert result.returncode == 0, f"Merger failed: {result.stderr}"
@@ -271,16 +280,12 @@ def test_e2e_002__merge_two_reports_metadata():
     try:
         # 1. Generate first report
         ws.generate_report(
-            "run_a",
-            "def test_a(): assert True",
-            metadata={"Project": "Alpha"}
+            "run_a", "def test_a(): assert True", metadata={"Project": "Alpha"}
         )
 
         # 2. Generate second report
         ws.generate_report(
-            "run_b",
-            "def test_b(): assert True",
-            metadata={"Environment": "Staging"}
+            "run_b", "def test_b(): assert True", metadata={"Environment": "Staging"}
         )
 
         # 3. Merge them
@@ -353,9 +358,9 @@ def test_s1(): pass
         # Categories that should remain zero
         # We check the exact strings expected in the HTML
         assert "0 Errors" in content
-        assert "0 Expected failures" in content   # for xfailed
-        assert "0 Unexpected passes" in content   # for xpassed
-        assert "0 Reruns" in content               # for rerun
+        assert "0 Expected failures" in content  # for xfailed
+        assert "0 Unexpected passes" in content  # for xpassed
+        assert "0 Reruns" in content  # for rerun
 
         # If your version of pytest-html has 'Retried'
         if "Retried" in content:
@@ -384,15 +389,12 @@ class tagData004:
 C_COUNT004 = 3
 
 g_Data004: typing.List[tagData004] = [
-    tagData004(counts=[x, C_COUNT004-x]) for x in range(0, C_COUNT004 + 1)
+    tagData004(counts=[x, C_COUNT004 - x]) for x in range(0, C_COUNT004 + 1)
 ]
 
 
 # ------------------------------------------------------------------------
-@pytest.fixture(
-    params=g_Data004,
-    ids=["-".join(map(str, x.counts)) for x in g_Data004]
-)
+@pytest.fixture(params=g_Data004, ids=["-".join(map(str, x.counts)) for x in g_Data004])
 def data004(request: pytest.FixtureRequest) -> tagData004:
     assert isinstance(request, pytest.FixtureRequest)
     return request.param
@@ -438,9 +440,9 @@ def test_e2e_004A__statistics_consistency__failed(data004: tagData004):
         # Categories that should remain zero
         # We check the exact strings expected in the HTML
         assert "0 Errors" in content
-        assert "0 Expected failures" in content   # for xfailed
-        assert "0 Unexpected passes" in content   # for xpassed
-        assert "0 Reruns" in content               # for rerun
+        assert "0 Expected failures" in content  # for xfailed
+        assert "0 Unexpected passes" in content  # for xpassed
+        assert "0 Reruns" in content  # for rerun
 
         # If your version of pytest-html has 'Retried'
         if "Retried" in content:
@@ -502,9 +504,9 @@ def test_e2e_004B__statistics_consistency__passed(data004: tagData004):
         # Categories that should remain zero
         # We check the exact strings expected in the HTML
         assert "0 Errors" in content
-        assert "0 Expected failures" in content   # for xfailed
-        assert "0 Unexpected passes" in content   # for xpassed
-        assert "0 Reruns" in content               # for rerun
+        assert "0 Expected failures" in content  # for xfailed
+        assert "0 Unexpected passes" in content  # for xpassed
+        assert "0 Reruns" in content  # for rerun
 
         # If your version of pytest-html has 'Retried'
         if "Retried" in content:
@@ -537,7 +539,7 @@ def test_e2e_004C__statistics_consistency__skipped(data004: tagData004):
             cTests += data004.counts[i]
             code = "import pytest\n"
             for n in range(data004.counts[i]):
-                code += "def test_p{}_{}(): pytest.skip(\"AAAA\")\n".format(i, n)
+                code += 'def test_p{}_{}(): pytest.skip("AAAA")\n'.format(i, n)
                 continue
 
             ws.generate_report("run_{}".format(i), code)
@@ -566,9 +568,9 @@ def test_e2e_004C__statistics_consistency__skipped(data004: tagData004):
         # Categories that should remain zero
         # We check the exact strings expected in the HTML
         assert "0 Errors" in content
-        assert "0 Expected failures" in content   # for xfailed
-        assert "0 Unexpected passes" in content   # for xpassed
-        assert "0 Reruns" in content               # for rerun
+        assert "0 Expected failures" in content  # for xfailed
+        assert "0 Unexpected passes" in content  # for xpassed
+        assert "0 Reruns" in content  # for rerun
 
         # If your version of pytest-html has 'Retried'
         if "Retried" in content:
@@ -601,7 +603,7 @@ def test_e2e_004D__statistics_consistency__xfailed(data004: tagData004):
             cTests += data004.counts[i]
             code = "import pytest\n"
             for n in range(data004.counts[i]):
-                code += "def test_p{}_{}(): pytest.xfail(\"AAAA\")\n".format(i, n)
+                code += 'def test_p{}_{}(): pytest.xfail("AAAA")\n'.format(i, n)
                 continue
 
             ws.generate_report("run_{}".format(i), code)
@@ -630,9 +632,9 @@ def test_e2e_004D__statistics_consistency__xfailed(data004: tagData004):
         # Categories that should remain zero
         # We check the exact strings expected in the HTML
         assert "0 Errors" in content
-        assert "{} Expected failures".format(cTests) in content   # for xfailed
-        assert "0 Unexpected passes" in content   # for xpassed
-        assert "0 Reruns" in content               # for rerun
+        assert "{} Expected failures".format(cTests) in content  # for xfailed
+        assert "0 Unexpected passes" in content  # for xpassed
+        assert "0 Reruns" in content  # for rerun
 
         # If your version of pytest-html has 'Retried'
         if "Retried" in content:
@@ -695,9 +697,9 @@ def test_e2e_004E__statistics_consistency__xpassed(data004: tagData004):
         # Categories that should remain zero
         # We check the exact strings expected in the HTML
         assert "0 Errors" in content
-        assert "0 Expected failures" in content   # for xfailed
-        assert "{} Unexpected passes".format(cTests) in content   # for xpassed
-        assert "0 Reruns" in content               # for rerun
+        assert "0 Expected failures" in content  # for xfailed
+        assert "{} Unexpected passes".format(cTests) in content  # for xpassed
+        assert "0 Reruns" in content  # for rerun
 
         # If your version of pytest-html has 'Retried'
         if "Retried" in content:
@@ -732,7 +734,9 @@ def test_e2e_004F__statistics_consistency__rerun(data004: tagData004):
             for n in range(data004.counts[i]):
                 code += "g_calls_{} = 0\n".format(n)
                 code += "@pytest.mark.flaky(reruns=3, reruns_delay=1)\n"
-                code += "def test_p{0}_{1}(): global g_calls_{1}; g_calls_{1}+=1; assert g_calls_{1}>1\n".format(i, n)
+                code += "def test_p{0}_{1}(): global g_calls_{1}; g_calls_{1}+=1; assert g_calls_{1}>1\n".format(
+                    i, n
+                )
                 continue
 
             ws.generate_report("run_{}".format(i), code)
@@ -761,8 +765,8 @@ def test_e2e_004F__statistics_consistency__rerun(data004: tagData004):
         # Categories that should remain zero
         # We check the exact strings expected in the HTML
         assert "0 Errors" in content
-        assert "0 Expected failures" in content   # for xfailed
-        assert "0 Unexpected passes" in content   # for xpassed
+        assert "0 Expected failures" in content  # for xfailed
+        assert "0 Unexpected passes" in content  # for xpassed
         assert "{} Reruns".format(cTests) in content  # for rerun
 
         # If your version of pytest-html has 'Retried'
@@ -828,8 +832,8 @@ def boom(): raise Exception("BOOM")\n
         # Categories that should remain zero
         # We check the exact strings expected in the HTML
         assert "{} Errors".format(cTests) in content  # three errorS!
-        assert "0 Expected failures" in content   # for xfailed
-        assert "0 Unexpected passes" in content   # for xpassed
+        assert "0 Expected failures" in content  # for xfailed
+        assert "0 Unexpected passes" in content  # for xpassed
         assert "0 Reruns" in content  # for rerun
 
         # If your version of pytest-html has 'Retried'
@@ -894,5 +898,6 @@ def test_error(boom): pass
 
     ws.cleanup()
     return
+
 
 # //////////////////////////////////////////////////////////////////////////////

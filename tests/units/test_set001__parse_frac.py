@@ -5,8 +5,8 @@ import dataclasses
 
 from src.pytest_html_report_merger import __main__ as prog
 
-
 # //////////////////////////////////////////////////////////////////////////////
+
 
 class TestSet001__parse_frac:
     @dataclasses.dataclass
@@ -111,7 +111,6 @@ class TestSet001__parse_frac:
             text="9999995",
             result=1.0,
         ),
-
         # Leading zeros (ensure they aren't lost by int conversion)
         tagData001Ok(
             sign="leading_zero",
@@ -148,10 +147,7 @@ class TestSet001__parse_frac:
     ]
 
     # --------------------------------------------------------------------
-    @pytest.fixture(
-        params=sm_Data001Ok,
-        ids=[x.sign for x in sm_Data001Ok]
-    )
+    @pytest.fixture(params=sm_Data001Ok, ids=[x.sign for x in sm_Data001Ok])
     def data001ok(self, request: pytest.FixtureRequest) -> tagData001Ok:
         return request.param
 
