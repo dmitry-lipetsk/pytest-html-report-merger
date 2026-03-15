@@ -10,14 +10,13 @@ import glob
 import typing
 import collections
 
-
 log = logging.getLogger(__name__)
 
 
 def parse_arguments():
     command_parser = argparse.ArgumentParser(
         description="A professional tool to merge multiple pytest-html reports into a single one with consistent metadata.",
-        epilog="Example: pytest-html-report-merger -i ./reports -o summary.html --title 'Nightly Build'"
+        epilog="Example: pytest-html-report-merger -i ./reports -o summary.html --title 'Nightly Build'",
     )
 
     command_parser.add_argument(
@@ -99,7 +98,7 @@ class PytestHTMLReportMerger:
         if tail and int(tail[0]) > 4:
             fraction_val += 1
 
-        return fraction_val / (10 ** power_of_10)
+        return fraction_val / (10**power_of_10)
 
     @staticmethod
     def _parse_duration_to_seconds(duration_val: typing.Any) -> float:
@@ -142,17 +141,17 @@ class PytestHTMLReportMerger:
 
         minutes, seconds = divmod(int(duration), 60)
         hours, minutes = divmod(minutes, 60)
-        return "{:02d}:{:02d}:{:02d}".format(
-            int(hours),
-            int(minutes),
-            int(seconds)
-        )
+        return "{:02d}:{:02d}:{:02d}".format(int(hours), int(minutes), int(seconds))
 
     def _process_test(self, test: typing.Dict[str, typing.Any]) -> None:
         assert test is not None
-        self._summary_duration += __class__._parse_duration_to_seconds(test.get("duration", 0.0))
+        self._summary_duration += __class__._parse_duration_to_seconds(
+            test.get("duration", 0.0)
+        )
         test_outcome = test.get("result", "unknown").lower()
-        self._summary_outcome[test_outcome] = self._summary_outcome.get(test_outcome, 0) + 1
+        self._summary_outcome[test_outcome] = (
+            self._summary_outcome.get(test_outcome, 0) + 1
+        )
         return
 
     def process_report(self, report_path):
@@ -180,9 +179,9 @@ class PytestHTMLReportMerger:
             elif type(test_data) is dict:
                 self._process_test(test_data)
             else:
-                raise RuntimeError("Unexpected test_data type: {}.".format(
-                    type(test_data).__name__
-                ))
+                raise RuntimeError(
+                    "Unexpected test_data type: {}.".format(type(test_data).__name__)
+                )
 
             self._summary_count += 1
             new_test_key = str(self._summary_count)
@@ -212,7 +211,7 @@ class PytestHTMLReportMerger:
         base_element.string = "{} {} took {}.".format(
             len(self._summary_tests),
             test_suffix,
-            __class__._format_time(self._summary_duration)
+            __class__._format_time(self._summary_duration),
         )
 
         # update the filter counts
@@ -234,12 +233,16 @@ class PytestHTMLReportMerger:
 
             if len(base_elements) == 0:
                 # pytest-html 4.0.2 does not have "retried"
-                log.debug(f"Filter element for '{key}' not found in HTML template. Skipping UI update for this key.")
+                log.debug(
+                    f"Filter element for '{key}' not found in HTML template. Skipping UI update for this key."
+                )
                 continue
 
-            assert len(base_elements) == 1, "key: {}, len: {}.".format(key, len(base_elements))
+            assert len(base_elements) == 1, "key: {}, len: {}.".format(
+                key, len(base_elements)
+            )
             base_element0 = base_elements[0]
-            assert base_element0.string is not None , "key: {}".format(key)
+            assert base_element0.string is not None, "key: {}".format(key)
             matches = re.search(r"(\d+)", base_element0.string)
             base_value = int(matches.groups()[0])
 
