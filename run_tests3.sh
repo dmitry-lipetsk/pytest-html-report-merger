@@ -1,11 +1,11 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -euo pipefail  # Our "strong control"
 
-if [ -z ${PYTEST_HTML_SPEC+x} ]; then
-  echo "ERROR: PYTEST_HTML_SPEC is not defined."
-  exit 1
-fi
+: "${PYTEST_HTML_SPEC:?Error: PYTEST_HTML_SPEC environment variable is not set!}"
 
-set -eux
+echo "--- Initializing test run ---"
+echo "Python version: $(python --version)"
+echo "Pytest-html spec: $PYTEST_HTML_SPEC"
 
 # prepare python environment
 VENV_PATH="/tmp/merger_venv"
