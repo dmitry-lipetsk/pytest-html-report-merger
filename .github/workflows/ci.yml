@@ -116,6 +116,8 @@ jobs:
             pytest_html: "default"
             case_suffix: "py3_14_xx-html_default"
 
+    name: "test: ${{ matrix.platform }} | ${{ matrix.case_suffix }}"
+
     env:
       BASE_SIGN: "${{ matrix.platform }}-py${{ matrix.case_suffix }}"
 
