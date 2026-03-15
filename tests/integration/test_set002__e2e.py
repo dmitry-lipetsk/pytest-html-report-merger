@@ -58,7 +58,7 @@ class HTML_FEATURES:
     @staticmethod
     def has_filter__retried(html_ver: Version) -> bool:
         assert type(html_ver) is Version
-        if html_ver > Version("4.0.2"):
+        if html_ver > Version("4.1.1"):
             return True
         return False
 
