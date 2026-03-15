@@ -10,6 +10,8 @@ import glob
 import typing
 import collections
 
+from packaging.version import Version
+
 log = logging.getLogger(__name__)
 
 
@@ -70,6 +72,8 @@ def parse_arguments():
 
 
 class PytestHTMLReportMerger:
+    C_MININAL_PYTEST_HTML_VERSION = "4.0.2"
+
     _summary_count: int
     _summary_duration: float
     _summary_outcome: typing.Dict[str, int]
@@ -143,6 +147,35 @@ class PytestHTMLReportMerger:
         hours, minutes = divmod(minutes, 60)
         return "{:02d}:{:02d}:{:02d}".format(int(hours), int(minutes), int(seconds))
 
+    # --------------------------------------------------------------------
+    @staticmethod
+    def _extract_pytest_html_version(
+        report_path,
+        report_soup: bs4.BeautifulSoup,
+    ) -> str:
+        assert report_path is not None
+        assert isinstance(report_soup, bs4.BeautifulSoup)
+
+        """
+        Robustly extract pytest-html version from the report footer/header.
+        Example text: '... by pytest-html v4.0.2'
+        """
+        link = report_soup.find("a", href=re.compile(r"pytest-html"))
+        if link is None:
+            raise RuntimeError("Report does not have section with pytest-html link.")
+
+        parent_text = link.parent.get_text()
+
+        # Looking for pattern 'v' and digits (v4.0.2)
+        match = re.search(r"v(\d+\.\d+\.\d+[\w\.]*)", parent_text)
+        if not match:
+            __class__._raise_err__cant_extract_report_version(
+                report_path,
+                parent_text,
+            )
+
+        return match.group(1)
+
     def _process_test(self, test: typing.Dict[str, typing.Any]) -> None:
         assert test is not None
         self._summary_duration += __class__._parse_duration_to_seconds(
@@ -159,6 +192,15 @@ class PytestHTMLReportMerger:
         with open(report_path, "r") as f:
             html_doc = f.read()
         soup = bs4.BeautifulSoup(html_doc, features="html.parser")
+
+        html_version = __class__._extract_pytest_html_version(
+            report_path,
+            soup,
+        )
+        assert type(html_version) is str
+
+        if Version(html_version) < Version(__class__.C_MININAL_PYTEST_HTML_VERSION):
+            __class__._raise_err__unsupported_html_version(report_path, html_version)
 
         # copy the base report
         if self.base is None:
@@ -276,6 +318,35 @@ class PytestHTMLReportMerger:
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(str(self.base.prettify(formatter="html5")))
         return
+
+    @staticmethod
+    def _raise_err__no_section_with_version(report_path) -> typing.NoReturn:
+        err_msg = "Report [{}] does not have section with pytest-html link.".format(
+            report_path
+        )
+        raise RuntimeError(err_msg)
+
+    @staticmethod
+    def _raise_err__cant_extract_report_version(report_path, text) -> typing.NoReturn:
+        assert report_path is not None
+        err_msg = "Cannot extract pytest-html version from {0!r}. Source file is [{1}]".format(
+            text,
+            report_path,
+        )
+        raise RuntimeError(err_msg)
+
+    @staticmethod
+    def _raise_err__unsupported_html_version(
+        report_path, version: str
+    ) -> typing.NoReturn:
+        assert report_path is not None
+        assert type(version) is str
+        err_msg = "Source file [{}] has an unsupported version [{}]. The minimal supported version is [{}].".format(
+            report_path,
+            version,
+            __class__.C_MININAL_PYTEST_HTML_VERSION,
+        )
+        raise RuntimeError(err_msg)
 
 
 def main(arguments):
