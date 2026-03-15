@@ -4,6 +4,7 @@ import sys
 import shutil
 import tempfile
 import subprocess
+import logging
 from pathlib import Path
 
 # /////////////////////////////////////////////////////////////////////////////
@@ -51,14 +52,14 @@ class E2EWorkspace:
         # Code 1 — there are failed tests.
         # Code 5 - no any tests were executed
         if result.returncode not in [0, 1, 5]:
-            print(f"STDOUT: {result.stdout}")
-            print(f"STDERR: {result.stderr}")
+            logging.info(f"STDOUT: {result.stdout}")
+            logging.info(f"STDERR: {result.stderr}")
             raise subprocess.CalledProcessError(result.returncode, cmd)
 
         # CRITICAL CHECK: Verify that the report file was actually created
         if not report_path.exists():
-            print(f"STDOUT: {result.stdout}")
-            print(f"STDERR: {result.stderr}")
+            logging.info(f"STDOUT: {result.stdout}")
+            logging.info(f"STDERR: {result.stderr}")
             raise FileNotFoundError(
                 f"Pytest finished with code {result.returncode}, "
                 f"but failed to generate report at: {report_path}"
