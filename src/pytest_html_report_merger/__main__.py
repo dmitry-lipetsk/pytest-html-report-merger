@@ -231,7 +231,13 @@ class PytestHTMLReportMerger:
             # find the base's value for the key
             base_elements = self.base.select(f".filters .{key}")
             assert base_elements is not None
-            assert len(base_elements) == 1
+
+            if len(base_elements) == 0:
+                # pytest-html 4.0.2 does not have "retried"
+                log.debug(f"Filter element for '{key}' not found in HTML template. Skipping UI update for this key.")
+                continue
+
+            assert len(base_elements) == 1, "key: {}, len: {}.".format(key, len(base_elements))
             base_element0 = base_elements[0]
             assert base_element0.string is not None , "key: {}".format(key)
             matches = re.search(r"(\d+)", base_element0.string)
@@ -281,7 +287,7 @@ def main(arguments):
                 log.error(f"Input directory does not exist: '{directory}'")
                 has_errors = True
                 continue
-            
+
             pattern = os.path.join(abs_dir, "*.html")
             found = glob.glob(pattern)
             raw_files.extend(found)
@@ -299,7 +305,7 @@ def main(arguments):
     # --- THE DEDUPLICATION CHECK ---
     counts = collections.Counter(raw_files)
     duplicates = [path for path, count in counts.items() if count > 1]
-    
+
     if duplicates:
         for d in duplicates:
             log.error(f"Duplicate input file detected: '{d}'")

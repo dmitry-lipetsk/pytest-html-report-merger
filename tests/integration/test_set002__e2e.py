@@ -2,8 +2,217 @@
 import pytest
 import dataclasses
 import typing
+import bs4
+import re
+
+from packaging.version import Version
 
 from .e2eworkspace import E2EWorkspace
+
+
+# //////////////////////////////////////////////////////////////////////////////
+
+class HTML_FEATURES:
+    @staticmethod
+    def has_filter__failed(html_ver: Version) -> bool:
+        assert type(html_ver) is Version
+        return True
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def has_filter__passed(html_ver: Version) -> bool:
+        assert type(html_ver) is Version
+        return True
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def has_filter__skipped(html_ver: Version) -> bool:
+        assert type(html_ver) is Version
+        return True
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def has_filter__xfailed(html_ver: Version) -> bool:
+        assert type(html_ver) is Version
+        return True
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def has_filter__xpassed(html_ver: Version) -> bool:
+        assert type(html_ver) is Version
+        return True
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def has_filter__error(html_ver: Version) -> bool:
+        assert type(html_ver) is Version
+        return True
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def has_filter__rerun(html_ver: Version) -> bool:
+        assert type(html_ver) is Version
+        return True
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def has_filter__retried(html_ver: Version) -> bool:
+        assert type(html_ver) is Version
+        if html_ver > Version("4.0.2"):
+            return True
+        return False
+
+
+# //////////////////////////////////////////////////////////////////////////////
+
+class HTML_CHECKER:
+    _content: str
+    _soup: bs4.BeautifulSoup
+    _html_version_text: str
+    _html_version: Version
+
+    # --------------------------------------------------------------------
+    def __init__(self, content: str):
+        assert type(content) is str
+        self._content = content
+        self._soup = bs4.BeautifulSoup(content, features="html.parser")
+        self._html_version_text = __class__._extract_pytest_html_version(self._soup)
+        self._html_version = Version(self._html_version_text)
+        return
+
+    # --------------------------------------------------------------------
+    def check_filter__failed(self, disabled: bool):
+        assert type(self._content) is str
+
+        if not HTML_FEATURES.has_filter__failed(self._html_version):
+            return
+
+        if disabled:
+            assert 'data-test-result="failed" disabled' in self._content
+        else:
+            assert 'data-test-result="failed"' in self._content
+            assert 'data-test-result="failed" disabled' not in self._content
+        return
+
+    # --------------------------------------------------------------------
+    def check_filter__passed(self, disabled: bool):
+        assert type(self._content) is str
+
+        if not HTML_FEATURES.has_filter__passed(self._html_version):
+            return
+
+        if disabled:
+            assert 'data-test-result="passed" disabled' in self._content
+        else:
+            assert 'data-test-result="passed"' in self._content
+            assert 'data-test-result="passed" disabled' not in self._content
+        return
+
+    # --------------------------------------------------------------------
+    def check_filter__skipped(self, disabled: bool):
+        assert type(self._content) is str
+
+        if not HTML_FEATURES.has_filter__skipped(self._html_version):
+            return
+
+        if disabled:
+            assert 'data-test-result="skipped" disabled' in self._content
+        else:
+            assert 'data-test-result="skipped"' in self._content
+            assert 'data-test-result="skipped" disabled' not in self._content
+        return
+
+    # --------------------------------------------------------------------
+    def check_filter__xfailed(self, disabled: bool):
+        assert type(self._content) is str
+
+        if not HTML_FEATURES.has_filter__xfailed(self._html_version):
+            return
+
+        if disabled:
+            assert 'data-test-result="xfailed" disabled' in self._content
+        else:
+            assert 'data-test-result="xfailed"' in self._content
+            assert 'data-test-result="xfailed" disabled' not in self._content
+        return
+
+    # --------------------------------------------------------------------
+    def check_filter__xpassed(self, disabled: bool):
+        assert type(self._content) is str
+
+        if not HTML_FEATURES.has_filter__xpassed(self._html_version):
+            return
+
+        if disabled:
+            assert 'data-test-result="xpassed" disabled' in self._content
+        else:
+            assert 'data-test-result="xpassed"' in self._content
+            assert 'data-test-result="xpassed" disabled' not in self._content
+        return
+
+    # --------------------------------------------------------------------
+    def check_filter__error(self, disabled: bool):
+        assert type(self._content) is str
+
+        if not HTML_FEATURES.has_filter__error(self._html_version):
+            return
+
+        if disabled:
+            assert 'data-test-result="error" disabled' in self._content
+        else:
+            assert 'data-test-result="error"' in self._content
+            assert 'data-test-result="error" disabled' not in self._content
+        return
+
+    # --------------------------------------------------------------------
+    def check_filter__rerun(self, disabled: bool):
+        assert type(self._content) is str
+
+        if not HTML_FEATURES.has_filter__rerun(self._html_version):
+            return
+
+        if disabled:
+            assert 'data-test-result="rerun" disabled' in self._content
+        else:
+            assert 'data-test-result="rerun"' in self._content
+            assert 'data-test-result="rerun" disabled' not in self._content
+        return
+
+    # --------------------------------------------------------------------
+    def check_filter__retried(self, disabled: bool):
+        assert type(self._content) is str
+
+        if not HTML_FEATURES.has_filter__retried(self._html_version):
+            return
+
+        if disabled:
+            assert 'data-test-result="retried" disabled' in self._content
+        else:
+            assert 'data-test-result="retried"' in self._content
+            assert 'data-test-result="retried" disabled' not in self._content
+        return
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def _extract_pytest_html_version(soup: bs4.BeautifulSoup) -> str:
+        assert isinstance(soup, bs4.BeautifulSoup)
+
+        """
+        Robustly extract pytest-html version from the report footer/header.
+        Example text: '... by pytest-html v4.0.2'
+        """
+        link = soup.find("a", href=re.compile(r"pytest-html"))
+        if link is None:
+            raise RuntimeError("Report does not have section with pytest-html link.")
+
+        parent_text = link.parent.get_text()
+
+        # Looking for pattern 'v' and digits (v4.0.2)
+        match = re.search(r"v(\d+\.\d+\.\d+[\w\.]*)", parent_text)
+        if not match:
+            raise RuntimeError("Cannot extract pytest-html version from {0!r}.".format(parent_text))
+
+        return match.group(1)
 
 
 # //////////////////////////////////////////////////////////////////////////////
@@ -127,7 +336,10 @@ def test_s1(): pass
         result = ws.run_merger(["-i", str(ws.reports_dir), "-o", str(output_html)])
 
         assert result.returncode == 0
+        assert output_html.exists()
         content = output_html.read_text()
+
+        html_checker = HTML_CHECKER(content)
 
         # --- Check Summary Line ---
         assert "4 tests took" in content
@@ -152,15 +364,9 @@ def test_s1(): pass
         # --- Advanced check: Ensure 'disabled' attribute is removed for active filters ---
         # The 'failed', 'passed', and 'skipped' filters must be clickable now.
         # We check that they DON'T have the 'disabled' string inside their tag.
-        assert 'data-test-result="failed"' in content
-        assert 'data-test-result="failed" disabled' not in content
-
-        assert 'data-test-result="passed"' in content
-        assert 'data-test-result="passed" disabled' not in content
-
-        # But 'error' should still be disabled because we have 0 errors
-        assert 'data-test-result="error"' in content
-        assert 'data-test-result="error" disabled' in content
+        html_checker.check_filter__failed(disabled=False)
+        html_checker.check_filter__passed(disabled=False)
+        html_checker.check_filter__error(disabled=True)
 
     finally:
         pass
@@ -215,7 +421,10 @@ def test_e2e_004A__statistics_consistency__failed(data004: tagData004):
         result = ws.run_merger(["-i", str(ws.reports_dir), "-o", str(output_html)])
 
         assert result.returncode == 0
+        assert output_html.exists()
         content = output_html.read_text()
+
+        html_checker = HTML_CHECKER(content)
 
         # --- Check Summary Line ---
         assert "{} tests took".format(cTests) in content
@@ -237,15 +446,14 @@ def test_e2e_004A__statistics_consistency__failed(data004: tagData004):
         if "Retried" in content:
             assert "0 Retried" in content
 
-        assert 'data-test-result="failed"' in content
-        assert 'data-test-result="failed" disabled' not in content
-        assert 'data-test-result="passed" disabled' in content
-        assert 'data-test-result="skipped" disabled' in content
-        assert 'data-test-result="xfailed" disabled' in content
-        assert 'data-test-result="xpassed" disabled' in content
-        assert 'data-test-result="error" disabled' in content
-        assert 'data-test-result="rerun" disabled' in content
-        assert 'data-test-result="retried" disabled' in content
+        html_checker.check_filter__failed(disabled=False)
+        html_checker.check_filter__passed(disabled=True)
+        html_checker.check_filter__skipped(disabled=True)
+        html_checker.check_filter__xfailed(disabled=True)
+        html_checker.check_filter__xpassed(disabled=True)
+        html_checker.check_filter__error(disabled=True)
+        html_checker.check_filter__rerun(disabled=True)
+        html_checker.check_filter__retried(disabled=True)
 
     finally:
         pass
@@ -277,7 +485,10 @@ def test_e2e_004B__statistics_consistency__passed(data004: tagData004):
         result = ws.run_merger(["-i", str(ws.reports_dir), "-o", str(output_html)])
 
         assert result.returncode == 0
+        assert output_html.exists()
         content = output_html.read_text()
+
+        html_checker = HTML_CHECKER(content)
 
         # --- Check Summary Line ---
         assert "{} tests took".format(cTests) in content
@@ -299,15 +510,14 @@ def test_e2e_004B__statistics_consistency__passed(data004: tagData004):
         if "Retried" in content:
             assert "0 Retried" in content
 
-        assert 'data-test-result="failed" disabled' in content
-        assert 'data-test-result="passed"' in content
-        assert 'data-test-result="passed" disabled' not in content
-        assert 'data-test-result="skipped" disabled' in content
-        assert 'data-test-result="xfailed" disabled' in content
-        assert 'data-test-result="xpassed" disabled' in content
-        assert 'data-test-result="error" disabled' in content
-        assert 'data-test-result="rerun" disabled' in content
-        assert 'data-test-result="retried" disabled' in content
+        html_checker.check_filter__failed(disabled=True)
+        html_checker.check_filter__passed(disabled=False)
+        html_checker.check_filter__skipped(disabled=True)
+        html_checker.check_filter__xfailed(disabled=True)
+        html_checker.check_filter__xpassed(disabled=True)
+        html_checker.check_filter__error(disabled=True)
+        html_checker.check_filter__rerun(disabled=True)
+        html_checker.check_filter__retried(disabled=True)
 
     finally:
         pass
@@ -339,7 +549,10 @@ def test_e2e_004C__statistics_consistency__skipped(data004: tagData004):
         result = ws.run_merger(["-i", str(ws.reports_dir), "-o", str(output_html)])
 
         assert result.returncode == 0
+        assert output_html.exists()
         content = output_html.read_text()
+
+        html_checker = HTML_CHECKER(content)
 
         # --- Check Summary Line ---
         assert "{} tests took".format(cTests) in content
@@ -361,15 +574,14 @@ def test_e2e_004C__statistics_consistency__skipped(data004: tagData004):
         if "Retried" in content:
             assert "0 Retried" in content
 
-        assert 'data-test-result="failed" disabled' in content
-        assert 'data-test-result="passed" disabled' in content
-        assert 'data-test-result="skipped"' in content
-        assert 'data-test-result="skipped" disabled' not in content
-        assert 'data-test-result="xfailed" disabled' in content
-        assert 'data-test-result="xpassed" disabled' in content
-        assert 'data-test-result="error" disabled' in content
-        assert 'data-test-result="rerun" disabled' in content
-        assert 'data-test-result="retried" disabled' in content
+        html_checker.check_filter__failed(disabled=True)
+        html_checker.check_filter__passed(disabled=True)
+        html_checker.check_filter__skipped(disabled=False)
+        html_checker.check_filter__xfailed(disabled=True)
+        html_checker.check_filter__xpassed(disabled=True)
+        html_checker.check_filter__error(disabled=True)
+        html_checker.check_filter__rerun(disabled=True)
+        html_checker.check_filter__retried(disabled=True)
 
     finally:
         pass
@@ -401,7 +613,10 @@ def test_e2e_004D__statistics_consistency__xfailed(data004: tagData004):
         result = ws.run_merger(["-i", str(ws.reports_dir), "-o", str(output_html)])
 
         assert result.returncode == 0
+        assert output_html.exists()
         content = output_html.read_text()
+
+        html_checker = HTML_CHECKER(content)
 
         # --- Check Summary Line ---
         assert "{} tests took".format(cTests) in content
@@ -423,15 +638,14 @@ def test_e2e_004D__statistics_consistency__xfailed(data004: tagData004):
         if "Retried" in content:
             assert "0 Retried" in content
 
-        assert 'data-test-result="failed" disabled' in content
-        assert 'data-test-result="passed" disabled' in content
-        assert 'data-test-result="skipped" disabled' in content
-        assert 'data-test-result="xfailed"' in content
-        assert 'data-test-result="xfailed" disabled' not in content
-        assert 'data-test-result="xpassed" disabled' in content
-        assert 'data-test-result="error" disabled' in content
-        assert 'data-test-result="rerun" disabled' in content
-        assert 'data-test-result="retried" disabled' in content
+        html_checker.check_filter__failed(disabled=True)
+        html_checker.check_filter__passed(disabled=True)
+        html_checker.check_filter__skipped(disabled=True)
+        html_checker.check_filter__xfailed(disabled=False)
+        html_checker.check_filter__xpassed(disabled=True)
+        html_checker.check_filter__error(disabled=True)
+        html_checker.check_filter__rerun(disabled=True)
+        html_checker.check_filter__retried(disabled=True)
 
     finally:
         pass
@@ -464,7 +678,10 @@ def test_e2e_004E__statistics_consistency__xpassed(data004: tagData004):
         result = ws.run_merger(["-i", str(ws.reports_dir), "-o", str(output_html)])
 
         assert result.returncode == 0
+        assert output_html.exists()
         content = output_html.read_text()
+
+        html_checker = HTML_CHECKER(content)
 
         # --- Check Summary Line ---
         assert "{} tests took".format(cTests) in content
@@ -486,15 +703,14 @@ def test_e2e_004E__statistics_consistency__xpassed(data004: tagData004):
         if "Retried" in content:
             assert "0 Retried" in content
 
-        assert 'data-test-result="failed" disabled' in content
-        assert 'data-test-result="passed" disabled' in content
-        assert 'data-test-result="skipped" disabled' in content
-        assert 'data-test-result="xfailed" disabled' in content
-        assert 'data-test-result="xpassed"' in content
-        assert 'data-test-result="xpassed" disabled' not in content
-        assert 'data-test-result="error" disabled' in content
-        assert 'data-test-result="rerun" disabled' in content
-        assert 'data-test-result="retried" disabled' in content
+        html_checker.check_filter__failed(disabled=True)
+        html_checker.check_filter__passed(disabled=True)
+        html_checker.check_filter__skipped(disabled=True)
+        html_checker.check_filter__xfailed(disabled=True)
+        html_checker.check_filter__xpassed(disabled=False)
+        html_checker.check_filter__error(disabled=True)
+        html_checker.check_filter__rerun(disabled=True)
+        html_checker.check_filter__retried(disabled=True)
 
     finally:
         pass
@@ -528,7 +744,10 @@ def test_e2e_004F__statistics_consistency__rerun(data004: tagData004):
         result = ws.run_merger(["-i", str(ws.reports_dir), "-o", str(output_html)])
 
         assert result.returncode == 0
+        assert output_html.exists()
         content = output_html.read_text()
+
+        html_checker = HTML_CHECKER(content)
 
         # --- Check Summary Line ---
         assert "{} tests took".format(cTests) in content
@@ -550,17 +769,14 @@ def test_e2e_004F__statistics_consistency__rerun(data004: tagData004):
         if "Retried" in content:
             assert "0 Retried" in content
 
-        assert 'data-test-result="failed" disabled' in content
-        assert 'data-test-result="passed"' in content
-        assert 'data-test-result="passed" disabled' not in content
-        assert 'data-test-result="skipped" disabled' in content
-        assert 'data-test-result="xfailed" disabled' in content
-        assert 'data-test-result="xpassed"' in content
-        assert 'data-test-result="xpassed" disabled' in content
-        assert 'data-test-result="error" disabled' in content
-        assert 'data-test-result="rerun"' in content
-        assert 'data-test-result="rerun" disabled' not in content
-        assert 'data-test-result="retried" disabled' in content
+        html_checker.check_filter__failed(disabled=True)
+        html_checker.check_filter__passed(disabled=False)
+        html_checker.check_filter__skipped(disabled=True)
+        html_checker.check_filter__xfailed(disabled=True)
+        html_checker.check_filter__xpassed(disabled=True)
+        html_checker.check_filter__error(disabled=True)
+        html_checker.check_filter__rerun(disabled=False)
+        html_checker.check_filter__retried(disabled=True)
 
     finally:
         pass
@@ -595,7 +811,10 @@ def boom(): raise Exception("BOOM")\n
         result = ws.run_merger(["-i", str(ws.reports_dir), "-o", str(output_html)])
 
         assert result.returncode == 0
+        assert output_html.exists()
         content = output_html.read_text()
+
+        html_checker = HTML_CHECKER(content)
 
         # --- Check Summary Line ---
         assert "{} tests took".format(cTests) in content
@@ -617,16 +836,14 @@ def boom(): raise Exception("BOOM")\n
         if "Retried" in content:
             assert "0 Retried" in content
 
-        assert 'data-test-result="failed" disabled' in content
-        assert 'data-test-result="passed" disabled' in content
-        assert 'data-test-result="skipped" disabled' in content
-        assert 'data-test-result="xfailed" disabled' in content
-        assert 'data-test-result="xpassed"' in content
-        assert 'data-test-result="xpassed" disabled' in content
-        assert 'data-test-result="error"' in content
-        assert 'data-test-result="error" disabled' not in content
-        assert 'data-test-result="rerun" disabled' in content
-        assert 'data-test-result="retried" disabled' in content
+        html_checker.check_filter__failed(disabled=True)
+        html_checker.check_filter__passed(disabled=True)
+        html_checker.check_filter__skipped(disabled=True)
+        html_checker.check_filter__xfailed(disabled=True)
+        html_checker.check_filter__xpassed(disabled=True)
+        html_checker.check_filter__error(disabled=False)
+        html_checker.check_filter__rerun(disabled=True)
+        html_checker.check_filter__retried(disabled=True)
 
     finally:
         pass
@@ -638,7 +855,7 @@ def boom(): raise Exception("BOOM")\n
 # ------------------------------------------------------------------------
 def test_e2e_005__statistics_consistency__error():
     # Author: Mark G <mark@google.com>
-    
+
     ws = E2EWorkspace(prefix="e2e_error_")
     try:
         # One OK test, One with an error in setup
@@ -653,18 +870,24 @@ def test_error(boom): pass
         ws.generate_report("run_err", code)
 
         output_html = ws.root / "error_check.html"
-        ws.run_merger(["-i", str(ws.reports_dir), "-o", str(output_html)])
+        result = ws.run_merger(["-i", str(ws.reports_dir), "-o", str(output_html)])
 
+        assert result.returncode == 0
+        assert output_html.exists()
         content = output_html.read_text()
+
+        html_checker = HTML_CHECKER(content)
 
         # Check our money
         assert "2 tests took" in content
+        assert "0 Failed" in content
         assert "1 Passed" in content
         assert "1 Error" in content  # one erroR!
 
         # Check a button
-        assert 'data-test-result="error"' in content
-        assert 'data-test-result="error" disabled' not in content
+        html_checker.check_filter__failed(disabled=True)
+        html_checker.check_filter__passed(disabled=False)
+        html_checker.check_filter__error(disabled=False)
 
     finally:
         pass
