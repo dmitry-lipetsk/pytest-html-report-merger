@@ -17,8 +17,8 @@ log = logging.getLogger(__name__)
 
 def parse_arguments():
     command_parser = argparse.ArgumentParser(
-        description="A professional tool to merge multiple pytest-html reports into a single one with consistent metadata.",
-        epilog="Example: pytest-html-report-merger -i ./reports -o summary.html --title 'Nightly Build'",
+        description="A professional tool to merge multiple pytest-html reports into a single one with consistent metadata.",  # noqa: E501
+        epilog="Example: pytest-html-report-merger -i ./reports -o summary.html --title 'Nightly Build'",  # noqa: E501
     )
 
     command_parser.add_argument(
@@ -34,7 +34,7 @@ def parse_arguments():
     command_parser.add_argument(
         "--input-dir",
         "-i",
-        help="directory containing html reports to merge (can be used multiple times)",
+        help="directory containing html reports to merge (can be used multiple times)",  # noqa: E501
         action="append",
         dest="input_dirs",
         type=str,
@@ -145,7 +145,11 @@ class PytestHTMLReportMerger:
 
         minutes, seconds = divmod(int(duration), 60)
         hours, minutes = divmod(minutes, 60)
-        return "{:02d}:{:02d}:{:02d}".format(int(hours), int(minutes), int(seconds))
+        return "{:02d}:{:02d}:{:02d}".format(
+            int(hours),
+            int(minutes),
+            int(seconds),
+        )
 
     # --------------------------------------------------------------------
     @staticmethod
@@ -162,7 +166,9 @@ class PytestHTMLReportMerger:
         """
         link = report_soup.find("a", href=re.compile(r"pytest-html"))
         if link is None:
-            raise RuntimeError("Report does not have section with pytest-html link.")
+            raise RuntimeError(
+                "Report does not have section with pytest-html link.",
+            )
 
         parent_text = link.parent.get_text()
 
@@ -199,8 +205,12 @@ class PytestHTMLReportMerger:
         )
         assert type(html_version) is str
 
-        if Version(html_version) < Version(__class__.C_MININAL_PYTEST_HTML_VERSION):
-            __class__._raise_err__unsupported_html_version(report_path, html_version)
+        min_version = Version(__class__.C_MININAL_PYTEST_HTML_VERSION)
+        if Version(html_version) < min_version:
+            __class__._raise_err__unsupported_html_version(
+                report_path,
+                html_version,
+            )
 
         # copy the base report
         if self.base is None:
@@ -222,7 +232,9 @@ class PytestHTMLReportMerger:
                 self._process_test(test_data)
             else:
                 raise RuntimeError(
-                    "Unexpected test_data type: {}.".format(type(test_data).__name__)
+                    "Unexpected test_data type: {}.".format(
+                        type(test_data).__name__,
+                    ),
                 )
 
             self._summary_count += 1
@@ -276,7 +288,7 @@ class PytestHTMLReportMerger:
             if len(base_elements) == 0:
                 # pytest-html 4.0.2 does not have "retried"
                 log.debug(
-                    f"Filter element for '{key}' not found in HTML template. Skipping UI update for this key."
+                    f"Filter element for '{key}' not found in HTML template. Skipping UI update for this key."  # noqa: E501
                 )
                 continue
 
@@ -321,15 +333,18 @@ class PytestHTMLReportMerger:
 
     @staticmethod
     def _raise_err__no_section_with_version(report_path) -> typing.NoReturn:
-        err_msg = "Report [{}] does not have section with pytest-html link.".format(
+        err_msg = "Report [{}] does not have section with pytest-html link.".format(  # noqa: E501
             report_path
         )
         raise RuntimeError(err_msg)
 
     @staticmethod
-    def _raise_err__cant_extract_report_version(report_path, text) -> typing.NoReturn:
+    def _raise_err__cant_extract_report_version(
+        report_path,
+        text,
+    ) -> typing.NoReturn:
         assert report_path is not None
-        err_msg = "Cannot extract pytest-html version from {0!r}. Source file is [{1}]".format(
+        err_msg = "Cannot extract pytest-html version from {0!r}. Source file is [{1}]".format(  # noqa: E501
             text,
             report_path,
         )
@@ -341,7 +356,7 @@ class PytestHTMLReportMerger:
     ) -> typing.NoReturn:
         assert report_path is not None
         assert type(version) is str
-        err_msg = "Source file [{}] has an unsupported version [{}]. The minimal supported version is [{}].".format(
+        err_msg = "Source file [{}] has an unsupported version [{}]. The minimal supported version is [{}].".format(  # noqa: E501
             report_path,
             version,
             __class__.C_MININAL_PYTEST_HTML_VERSION,
@@ -371,7 +386,9 @@ def main(arguments):
         for f in arguments.html_files:
             abs_file = os.path.abspath(f)
             if not os.path.isfile(abs_file):
-                log.error(f"Invalid input: '{f}' is not a file or does not exist.")
+                log.error(
+                    f"Invalid input: '{f}' is not a file or does not exist.",
+                )
                 has_errors = True
                 continue
             raw_files.append(abs_file)
@@ -387,7 +404,9 @@ def main(arguments):
 
     # 3. Final check
     if has_errors:
-        log.error("Termination due to input errors (duplicates or missing files).")
+        log.error(
+            "Termination due to input errors (duplicates or missing files).",
+        )
         sys.exit(1)
 
     if not raw_files:
@@ -406,7 +425,9 @@ def main(arguments):
 
     # Finalize and write the aggregated report to disk
     report_merger.write_report(arguments.out, arguments.title)
-    log.info(f"Successfully merged {len(raw_files)} reports into {arguments.out}")
+    log.info(
+        f"Successfully merged {len(raw_files)} reports into {arguments.out}",
+    )
     return
 
 
